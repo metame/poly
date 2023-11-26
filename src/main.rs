@@ -120,6 +120,7 @@ enum Command {
     Run,
     Docs,
     Test,
+    Repl,
 }
 
 #[derive(Parser, Debug)]
@@ -136,6 +137,13 @@ impl Command {
             Self::Run => r.run,
             Self::Docs => r.docs,
             Self::Test => r.test,
+            Self::Repl => {
+                if let Some(repl) = r.repl {
+                    repl
+                } else {
+                    "it don't have none"
+                }
+            },
         };
         println!("{}", res);
     }
