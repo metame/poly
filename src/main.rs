@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::{self, Write, Read};
+use std::process::{Stdio};
 use clap::{Parser, ValueEnum};
 use lazy_static::lazy_static;
 
@@ -85,7 +87,7 @@ lazy_static! {
             repl: Some("cargo install irust && irust"),
         });
         map.insert(Lang::Clojure, Resources {
-            build: "lein build",
+            build: "lein uberjar",
             run: "lein run",
             docs: "https://clojuredocs.org",
             test: "lein test",
@@ -93,8 +95,20 @@ lazy_static! {
         });
         map
     };
+
+    static ref MV2: HashMap<Lang, ResourcesV2> = {
+        let mut map = HashMap::new();
+        map
+    };
 }
 
+struct ResourcesV2 {
+    build: Option<&'static str>,
+    //run: Option<&'static str>,
+    //docs: Option<&'static str>,
+    //test: Option<&'static str>,
+    //repl: Option<&'static str>,
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
 enum Lang {
@@ -121,6 +135,7 @@ enum Command {
     Docs,
     Test,
     Repl,
+    // TODO: init project?
 }
 
 #[derive(Parser, Debug)]
@@ -151,12 +166,45 @@ impl Command {
 
 // return result from main
 fn main() {
-    let args = Args::parse();
-
+    // let args = Args::parse();
+    /*
     println!("You want to {:?} with {:?}? Let me try to help you with that", args.command, args.lang);
 
     match M.get(&args.lang) {
         Some(r) => args.command.print_resource(r),
         None => todo!("Crap, I'm sorry I didn't do this yet for {:?}", args.lang),
     }
+     */
+
+    let mut child = std::process::Command::new("ls")
+        .arg("-l")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to execute process");
+
+    let mut stdout = child.stdout.take().unwrap();
+
+    let mut buffer = [0; 4096];
+
+    let stdout_handle = io::stdout();
+    let mut stdout_lock = stdout_handle.lock();
+    loop {
+        match stdout.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => {
+                stdout_lock.write_all(&buffer[0..n]).expect("write all failed");
+                stdout_lock.flush().expect("flush failed");
+            }
+            Err(err) => {
+                println!("{err:?}");
+                return;
+            }
+        }
+    }
+
+    let status = child.wait().expect("wait failed");
+
+    println!("{status}");
+
 }
