@@ -1,6 +1,7 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
-use std::io::{self, Write, Read};
-use std::process::{Stdio};
+use std::process::Stdio;
+
 use clap::{Parser, ValueEnum};
 use lazy_static::lazy_static;
 
@@ -98,16 +99,62 @@ lazy_static! {
 
     static ref MV2: HashMap<Lang, ResourcesV2> = {
         let mut map = HashMap::new();
+        map.insert(Lang::C, ResourcesV2 {
+            build: Some(Bin::new("make", Box::new([]))), // requires file(s)
+            run: None,
+            test: None,
+        });
+        map.insert(Lang::CPP, ResourcesV2 {
+            build: Some(Bin::new("make", Box::new([]))), // requires file(s)
+            run: None,
+            test: None,
+        });
+        map.insert(Lang::Zig, ResourcesV2 {
+            build: Some(Bin::new("zig", Box::new(["build"]))),
+            run: Some(Bin::new("zig", Box::new(["run"]))),
+            test: Some(Bin::new("zig", Box::new(["test"]))),
+        });
+        map.insert(Lang::Haskell, ResourcesV2 {
+            build: Some(Bin::new("stack", Box::new(["build"]))),
+            run: Some(Bin::new("stack", Box::new(["run"]))),
+            test: Some(Bin::new("stack", Box::new(["test"]))),
+        });
+        map.insert(Lang::Ocaml, ResourcesV2 {
+            build: Some(Bin::new("dune", Box::new(["build"]))),
+            run: Some(Bin::new("dune", Box::new(["exec", "./bin/main.ml"]))), // requires prog arg
+            test: Some(Bin::new("dune", Box::new(["test"]))),
+        });
+        map.insert(Lang::Rust, ResourcesV2 {
+            build: Some(Bin::new("cargo", Box::new(["build"]))),
+            run: Some(Bin::new("cargo", Box::new(["run"]))),
+            test: Some(Bin::new("cargo", Box::new(["test"]))),
+        });
+        map.insert(Lang::Clojure, ResourcesV2 {
+            build: Some(Bin::new("lein", Box::new(["uberjar"]))),
+            run: Some(Bin::new("lein", Box::new(["run"]))),
+            test: Some(Bin::new("lein", Box::new(["test"]))),
+        });
         map
     };
 }
 
+struct Bin {
+    name: &'static str,
+    args: Box<[&'static str]>,
+}
+
+impl Bin {
+    fn new(name: &'static str, args: Box<[&'static str]>) -> Self {
+        Bin { name, args }
+    }
+}
+
 struct ResourcesV2 {
-    build: Option<&'static str>,
-    //run: Option<&'static str>,
-    //docs: Option<&'static str>,
-    //test: Option<&'static str>,
-    //repl: Option<&'static str>,
+    build: Option<Bin>,
+    run: Option<Bin>,
+    //docs: Option<Bin>,
+    test: Option<Bin>,
+    //repl: Option<Bin>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
@@ -146,6 +193,15 @@ struct Args {
 }
 
 impl Command {
+    fn get_resource<'a>(&self, r: &'a ResourcesV2) -> Option<&'a Bin> {
+        match self {
+            Self::Build => r.build.as_ref(),
+            Self::Run => r.run.as_ref(),
+            Self::Test => r.test.as_ref(),
+            _ => None,
+        }
+    }
+
     fn print_resource(&self, r: &Resources) {
         let res = match self {
             Self::Build => r.build,
@@ -158,15 +214,19 @@ impl Command {
                 } else {
                     "it don't have none"
                 }
-            },
+            }
         };
         println!("{}", res);
     }
 }
 
 // return result from main
+// TODO: support arbitrary argument to any command
+// https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
+// TODO: support printing command instead of running, maybe --dry ?
+// TODO: for unrunnable (in cli) commands for a supported language, maybe print info?
 fn main() {
-    // let args = Args::parse();
+    let args = Args::parse();
     /*
     println!("You want to {:?} with {:?}? Let me try to help you with that", args.command, args.lang);
 
@@ -176,35 +236,26 @@ fn main() {
     }
      */
 
-    let mut child = std::process::Command::new("ls")
-        .arg("-l")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let o_bin = match MV2.get(&args.lang) {
+        Some(r) => args.command.get_resource(r),
+        None => None,
+    };
+
+    let bin = match o_bin {
+        Some(b) => b,
+        None => todo!(
+            "Crap, I'm sorry I didn't do this yet for {:?} {:?}",
+            args.lang,
+            args.command
+        ),
+    };
+
+    std::process::Command::new(bin.name)
+        .args(bin.args.iter())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .spawn()
-        .expect("failed to execute process");
-
-    let mut stdout = child.stdout.take().unwrap();
-
-    let mut buffer = [0; 4096];
-
-    let stdout_handle = io::stdout();
-    let mut stdout_lock = stdout_handle.lock();
-    loop {
-        match stdout.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(n) => {
-                stdout_lock.write_all(&buffer[0..n]).expect("write all failed");
-                stdout_lock.flush().expect("flush failed");
-            }
-            Err(err) => {
-                println!("{err:?}");
-                return;
-            }
-        }
-    }
-
-    let status = child.wait().expect("wait failed");
-
-    println!("{status}");
-
+        .expect("failed to execute process")
+        .wait()
+        .expect("wait failed");
 }
