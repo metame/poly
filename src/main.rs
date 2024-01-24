@@ -256,8 +256,7 @@ fn main() {
         dry_run(&args.lang, &args.command, false);
     } else {
         MV2.get(&args.lang)
-            .map(|r| args.command.get_resource(r))
-            .flatten()
+            .and_then(|r| args.command.get_resource(r))
             .map_or_else(|| dry_run(&args.lang, &args.command, true),
                          |b| b.run());
     }
