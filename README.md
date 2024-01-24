@@ -6,6 +6,10 @@ The tool to end all tools
 
 `$ cargo install --git https://github.com/metame/poly.git`
 
+or clone repo and run:
+
+`cargo install --path .`
+
 ## Usage
 
 `$ poly <language> <command>`

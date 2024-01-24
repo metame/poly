@@ -190,6 +190,8 @@ enum Command {
 struct Args {
     lang: Lang,
     command: Command,
+    #[arg(short, long)]
+    dry: bool,
 }
 
 impl Command {
@@ -220,42 +222,47 @@ impl Command {
     }
 }
 
+fn dry_run(lang: &Lang, cmd: &Command) {
+    match M.get(lang) {
+        Some(r) => cmd.print_resource(r),
+        None => todo!("Crap, I'm sorry I don't know how to {:?} yet for {:?}", cmd, lang),
+    }
+}
+
 // return result from main
 // TODO: support arbitrary argument to any command
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
-// TODO: support printing command instead of running, maybe --dry ?
-// TODO: for unrunnable (in cli) commands for a supported language, maybe print info?
 fn main() {
     let args = Args::parse();
-    /*
-    println!("You want to {:?} with {:?}? Let me try to help you with that", args.command, args.lang);
 
-    match M.get(&args.lang) {
-        Some(r) => args.command.print_resource(r),
-        None => todo!("Crap, I'm sorry I didn't do this yet for {:?}", args.lang),
+    let s = if args.dry {"know how to "} else {""};
+    println!("You want to {s}{:?} with {:?}? Let me try to help you with that", args.command, args.lang);
+
+    if args.dry {
+        dry_run(&args.lang, &args.command);
+    } else {
+        let o_bin = match MV2.get(&args.lang) {
+            Some(r) => args.command.get_resource(r),
+            None => None,
+        };
+
+        match o_bin {
+            Some(b) => {
+                std::process::Command::new(b.name)
+                    .args(b.args.iter())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .spawn()
+                    .expect("failed to execute process")
+                    .wait()
+                    .expect("wait failed");
+            },
+            None => {
+                println!("I don't know how to do this yet but here's how you can do it yourself (hopefully)");
+                dry_run(&args.lang, &args.command);
+            },
+        };
+
     }
-     */
 
-    let o_bin = match MV2.get(&args.lang) {
-        Some(r) => args.command.get_resource(r),
-        None => None,
-    };
-
-    let bin = match o_bin {
-        Some(b) => b,
-        None => todo!(
-            "Crap, I'm sorry I didn't do this yet for {:?} {:?}",
-            args.lang,
-            args.command
-        ),
-    };
-
-    std::process::Command::new(bin.name)
-        .args(bin.args.iter())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("failed to execute process")
-        .wait()
-        .expect("wait failed");
 }
