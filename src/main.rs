@@ -147,6 +147,17 @@ impl Bin {
     fn new(name: &'static str, args: Box<[&'static str]>) -> Self {
         Bin { name, args }
     }
+
+    fn run(&self) {
+        std::process::Command::new(self.name)
+            .args(self.args.iter())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("failed to execute process")
+            .wait()
+            .expect("wait failed");
+    }
 }
 
 struct ResourcesV2 {
@@ -222,7 +233,10 @@ impl Command {
     }
 }
 
-fn dry_run(lang: &Lang, cmd: &Command) {
+fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
+    if eff {
+        println!("I don't know how to do this yet but here's how you can do it yourself (hopefully)");
+    }
     match M.get(lang) {
         Some(r) => cmd.print_resource(r),
         None => todo!("Crap, I'm sorry I don't know how to {:?} yet for {:?}", cmd, lang),
@@ -239,30 +253,12 @@ fn main() {
     println!("You want to {s}{:?} with {:?}? Let me try to help you with that", args.command, args.lang);
 
     if args.dry {
-        dry_run(&args.lang, &args.command);
+        dry_run(&args.lang, &args.command, false);
     } else {
-        let o_bin = match MV2.get(&args.lang) {
-            Some(r) => args.command.get_resource(r),
-            None => None,
-        };
-
-        match o_bin {
-            Some(b) => {
-                std::process::Command::new(b.name)
-                    .args(b.args.iter())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .spawn()
-                    .expect("failed to execute process")
-                    .wait()
-                    .expect("wait failed");
-            },
-            None => {
-                println!("I don't know how to do this yet but here's how you can do it yourself (hopefully)");
-                dry_run(&args.lang, &args.command);
-            },
-        };
-
+        MV2.get(&args.lang)
+            .map(|r| args.command.get_resource(r))
+            .flatten()
+            .map_or_else(|| dry_run(&args.lang, &args.command, true),
+                         |b| b.run());
     }
-
 }
