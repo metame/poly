@@ -246,6 +246,7 @@ fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
 // return result from main
 // TODO: support arbitrary argument to any command
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
+// TODO: poly clojure repl -> repl
 fn main() {
     let args = Args::parse();
 
