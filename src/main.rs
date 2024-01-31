@@ -103,36 +103,43 @@ lazy_static! {
             build: Some(Bin::new("make", Box::new([]))), // requires file(s)
             run: None,
             test: None,
+            repl: None,
         });
         map.insert(Lang::CPP, ResourcesV2 {
             build: Some(Bin::new("make", Box::new([]))), // requires file(s)
             run: None,
             test: None,
+            repl: None,
         });
         map.insert(Lang::Zig, ResourcesV2 {
             build: Some(Bin::new("zig", Box::new(["build"]))),
             run: Some(Bin::new("zig", Box::new(["run"]))),
             test: Some(Bin::new("zig", Box::new(["test"]))),
+            repl: None,
         });
         map.insert(Lang::Haskell, ResourcesV2 {
             build: Some(Bin::new("stack", Box::new(["build"]))),
             run: Some(Bin::new("stack", Box::new(["run"]))),
             test: Some(Bin::new("stack", Box::new(["test"]))),
+            repl: None,
         });
         map.insert(Lang::Ocaml, ResourcesV2 {
             build: Some(Bin::new("dune", Box::new(["build"]))),
-            run: Some(Bin::new("dune", Box::new(["exec", "./bin/main.ml"]))), // requires prog arg
+            run: Some(Bin::new("dune", Box::new(["exec"]))),
             test: Some(Bin::new("dune", Box::new(["test"]))),
+            repl: Some(Bin::new("utop", Box::new([]))),
         });
         map.insert(Lang::Rust, ResourcesV2 {
             build: Some(Bin::new("cargo", Box::new(["build"]))),
             run: Some(Bin::new("cargo", Box::new(["run"]))),
             test: Some(Bin::new("cargo", Box::new(["test"]))),
+            repl: None,
         });
         map.insert(Lang::Clojure, ResourcesV2 {
             build: Some(Bin::new("lein", Box::new(["uberjar"]))),
             run: Some(Bin::new("lein", Box::new(["run"]))),
             test: Some(Bin::new("lein", Box::new(["test"]))),
+            repl: None,
         });
         map
     };
@@ -148,9 +155,17 @@ impl Bin {
         Bin { name, args }
     }
 
-    fn run(&self) {
+    fn run(&self, user_args: &Option<String>) {
+        let args = if let Some(args) = user_args {
+            let mut v = self.args.to_vec();
+            v.push(&args);
+            v
+        } else {
+            self.args.to_vec()
+        };
+
         std::process::Command::new(self.name)
-            .args(self.args.iter())
+            .args(args)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .spawn()
@@ -165,7 +180,7 @@ struct ResourcesV2 {
     run: Option<Bin>,
     //docs: Option<Bin>,
     test: Option<Bin>,
-    //repl: Option<Bin>,
+    repl: Option<Bin>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
@@ -203,6 +218,8 @@ struct Args {
     command: Command,
     #[arg(short, long)]
     dry: bool,
+    #[arg(short, long)]
+    args: Option<String>,
 }
 
 impl Command {
@@ -235,30 +252,41 @@ impl Command {
 
 fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
     if eff {
-        println!("I don't know how to do this yet but here's how you can do it yourself (hopefully)");
+        println!(
+            "I don't know how to do this yet but here's how you can do it yourself (hopefully)"
+        );
     }
     match M.get(lang) {
         Some(r) => cmd.print_resource(r),
-        None => todo!("Crap, I'm sorry I don't know how to {:?} yet for {:?}", cmd, lang),
+        None => todo!(
+            "Crap, I'm sorry I don't know how to {:?} yet for {:?}",
+            cmd,
+            lang
+        ),
     }
 }
 
 // return result from main
-// TODO: support arbitrary argument to any command
+// TODO?: change --args to trailing_var_arg
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
 // TODO: poly clojure repl -> repl
 fn main() {
     let args = Args::parse();
 
-    let s = if args.dry {"know how to "} else {""};
-    println!("You want to {s}{:?} with {:?}? Let me try to help you with that", args.command, args.lang);
+    let s = if args.dry { "know how to " } else { "" };
+    println!(
+        "You want to {s}{:?} with {:?}? Let me try to help you with that",
+        args.command, args.lang
+    );
 
     if args.dry {
         dry_run(&args.lang, &args.command, false);
     } else {
         MV2.get(&args.lang)
             .and_then(|r| args.command.get_resource(r))
-            .map_or_else(|| dry_run(&args.lang, &args.command, true),
-                         |b| b.run());
+            .map_or_else(
+                || dry_run(&args.lang, &args.command, true),
+                |b| b.run(&args.args),
+            );
     }
 }
