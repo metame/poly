@@ -53,7 +53,7 @@ lazy_static! {
         });
         map.insert(Lang::Racket, Resources {
             build: "see repl",
-            run: "see repl",
+            run: "racket <file_name>",
             docs: "https://docs.racket-lang.org/reference/index.html",
             test: "see repl",
             repl: Some("racket"),
@@ -117,11 +117,35 @@ lazy_static! {
             test: Some(Bin::new("zig", Box::new(["test"]))),
             repl: None,
         });
+        map.insert(Lang::Scheme, ResourcesV2 {
+            build: None,
+            run: None,
+            test: None,
+            repl: Some(Bin::new("guile", Box::new([]))),
+        });
+        map.insert(Lang::CommonLisp, ResourcesV2 {
+            build: None,
+            run: None,
+            test: None,
+            repl: Some(Bin::new("sbcl", Box::new([]))),
+        });
+        map.insert(Lang::Racket, ResourcesV2 {
+            build: None,
+            run: Some(Bin::new("racket", Box::new([]))),
+            test: None,
+            repl: Some(Bin::new("racket", Box::new([]))),
+        });
+        map.insert(Lang::Sml, ResourcesV2 {
+            build: None,
+            run: None,
+            test: None,
+            repl: Some(Bin::new("sml", Box::new([]))),
+        });
         map.insert(Lang::Haskell, ResourcesV2 {
             build: Some(Bin::new("stack", Box::new(["build"]))),
             run: Some(Bin::new("stack", Box::new(["run"]))),
             test: Some(Bin::new("stack", Box::new(["test"]))),
-            repl: None,
+            repl: Some(Bin::new("stack", Box::new(["ghci"]))),
         });
         map.insert(Lang::Ocaml, ResourcesV2 {
             build: Some(Bin::new("dune", Box::new(["build"]))),
@@ -133,13 +157,13 @@ lazy_static! {
             build: Some(Bin::new("cargo", Box::new(["build"]))),
             run: Some(Bin::new("cargo", Box::new(["run"]))),
             test: Some(Bin::new("cargo", Box::new(["test"]))),
-            repl: None,
+            repl: Some(Bin::new("irust", Box::new([]))),
         });
         map.insert(Lang::Clojure, ResourcesV2 {
             build: Some(Bin::new("lein", Box::new(["uberjar"]))),
             run: Some(Bin::new("lein", Box::new(["run"]))),
             test: Some(Bin::new("lein", Box::new(["test"]))),
-            repl: None,
+            repl: Some(Bin::new("lein", Box::new(["repl"]))),
         });
         map
     };
@@ -228,6 +252,7 @@ impl Command {
             Self::Build => r.build.as_ref(),
             Self::Run => r.run.as_ref(),
             Self::Test => r.test.as_ref(),
+            Self::Repl => r.repl.as_ref(),
             _ => None,
         }
     }
@@ -269,7 +294,8 @@ fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
 // return result from main
 // TODO?: change --args to trailing_var_arg
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
-// TODO: poly clojure repl -> repl
+// TODO: fill out repl commands in hashmap
+// TODO: required args?
 fn main() {
     let args = Args::parse();
 
@@ -282,6 +308,7 @@ fn main() {
     if args.dry {
         dry_run(&args.lang, &args.command, false);
     } else {
+
         MV2.get(&args.lang)
             .and_then(|r| args.command.get_resource(r))
             .map_or_else(
