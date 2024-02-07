@@ -4,6 +4,7 @@ use std::process::Stdio;
 
 use clap::{Parser, ValueEnum};
 use lazy_static::lazy_static;
+use open;
 
 struct Resources {
     build: &'static str,
@@ -75,8 +76,7 @@ lazy_static! {
         map.insert(Lang::Ocaml, Resources {
             build: "dune build",
             run: "dune exec <project_name>",
-            // https://v2.ocaml.org/releases/5.1/api/index.html
-            docs: "dmmulroy",
+            docs: "https://v2.ocaml.org/releases/5.1/api/index.html",
             test: "dune test",
             repl: Some("utop"),
         });
@@ -104,66 +104,78 @@ lazy_static! {
             run: None,
             test: None,
             repl: None,
+            docs: Some(Bin::new("open", Box::new(["https://en.cppreference.com/w/c"])))
         });
         map.insert(Lang::CPP, ResourcesV2 {
             build: Some(Bin::new("make", Box::new([]))), // requires file(s)
             run: None,
             test: None,
             repl: None,
+            docs: Some(Bin::new("open", Box::new(["https://en.cppreference.com/w/cpp"])))
         });
         map.insert(Lang::Zig, ResourcesV2 {
             build: Some(Bin::new("zig", Box::new(["build"]))),
             run: Some(Bin::new("zig", Box::new(["run"]))),
             test: Some(Bin::new("zig", Box::new(["test"]))),
             repl: None,
+            docs: Some(Bin::new("open", Box::new(["https://ziglang.org/documentation/master/std/#A;std"]))),
         });
         map.insert(Lang::Scheme, ResourcesV2 {
             build: None,
             run: None,
             test: None,
             repl: Some(Bin::new("guile", Box::new([]))),
+            docs: Some(Bin::new("open", Box::new(["https://www.gnu.org/software/guile/manual/guile.html#API-Reference"])))
         });
         map.insert(Lang::CommonLisp, ResourcesV2 {
             build: None,
             run: None,
             test: None,
             repl: Some(Bin::new("sbcl", Box::new([]))),
+            docs: Some(Bin::new("open", Box::new(["https://www.lispworks.com/documentation/lw51/CLHS/Front/X_AllSym.htm"])))
         });
         map.insert(Lang::Racket, ResourcesV2 {
             build: None,
             run: Some(Bin::new("racket", Box::new([]))),
             test: None,
             repl: Some(Bin::new("racket", Box::new([]))),
+            docs: Some(Bin::new("open", Box::new(["https://docs.racket-lang.org/reference/index.html"])))
         });
         map.insert(Lang::Sml, ResourcesV2 {
             build: None,
             run: None,
             test: None,
             repl: Some(Bin::new("sml", Box::new([]))),
+            docs: Some(Bin::new("open", Box::new(["https://smlfamily.github.io/Basis/overview.html"])))
         });
         map.insert(Lang::Haskell, ResourcesV2 {
             build: Some(Bin::new("stack", Box::new(["build"]))),
             run: Some(Bin::new("stack", Box::new(["run"]))),
             test: Some(Bin::new("stack", Box::new(["test"]))),
             repl: Some(Bin::new("stack", Box::new(["ghci"]))),
+            docs: Some(Bin::new("open", Box::new(["https://hoogle.haskell.org/"])))
         });
         map.insert(Lang::Ocaml, ResourcesV2 {
             build: Some(Bin::new("dune", Box::new(["build"]))),
             run: Some(Bin::new("dune", Box::new(["exec"]))),
             test: Some(Bin::new("dune", Box::new(["test"]))),
             repl: Some(Bin::new("utop", Box::new([]))),
+            docs: Some(Bin::new("open", Box::new(["https://twitch.tv/dmmulroy"])))
         });
         map.insert(Lang::Rust, ResourcesV2 {
             build: Some(Bin::new("cargo", Box::new(["build"]))),
             run: Some(Bin::new("cargo", Box::new(["run"]))),
             test: Some(Bin::new("cargo", Box::new(["test"]))),
             repl: Some(Bin::new("irust", Box::new([]))),
+            // TODO: should we do `cargo doc --open` or url?
+            docs: Some(Bin::new("open", Box::new(["https://doc.rust-lang.org/stable/std/"])))
         });
         map.insert(Lang::Clojure, ResourcesV2 {
             build: Some(Bin::new("lein", Box::new(["uberjar"]))),
             run: Some(Bin::new("lein", Box::new(["run"]))),
             test: Some(Bin::new("lein", Box::new(["test"]))),
             repl: Some(Bin::new("lein", Box::new(["repl"]))),
+            docs: Some(Bin::new("open", Box::new(["https://clojuredocs.org"])))
         });
         map
     };
@@ -188,23 +200,28 @@ impl Bin {
             self.args.to_vec()
         };
 
-        std::process::Command::new(self.name)
-            .args(args)
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .expect("failed to execute process")
-            .wait()
-            .expect("wait failed");
+        if self.name == "open" {
+            // TODO: print failure of open to console
+            open::that(args[0]).expect("failed to open");
+        } else {
+            std::process::Command::new(self.name)
+                .args(args)
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .expect("failed to execute process")
+                .wait()
+                .expect("wait failed");
+        }
     }
 }
 
 struct ResourcesV2 {
     build: Option<Bin>,
     run: Option<Bin>,
-    //docs: Option<Bin>,
     test: Option<Bin>,
     repl: Option<Bin>,
+    docs: Option<Bin>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValueEnum)]
@@ -253,7 +270,7 @@ impl Command {
             Self::Run => r.run.as_ref(),
             Self::Test => r.test.as_ref(),
             Self::Repl => r.repl.as_ref(),
-            _ => None,
+            Self::Docs => r.docs.as_ref(),
         }
     }
 
