@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
+use std::fs;
 use std::process::Stdio;
 
 use clap::{Parser, ValueEnum};
@@ -191,13 +192,35 @@ impl Bin {
         Bin { name, args }
     }
 
-    fn run(&self, user_args: &Option<String>) {
+    fn run(&self, user_args: &Option<String>) -> Result<(), std::io::Error> {
+        let mut p = String::new();
+        // if user_args is None, and arg is required, should try to "fill in" valid arg
         let args = if let Some(args) = user_args {
             let mut v = self.args.to_vec();
             v.push(&args);
             v
         } else {
-            self.args.to_vec()
+            // TODO: something that makes this work, like maybe matches instead of all of these nested if's and just not coding anymore in your life
+            if self.name == "dune" && self.args[0] == "exec" {
+                let mut entries = fs::read_dir("./")?;
+                let project = entries.find_map(|e| {
+                    if let Ok(entry) = e {
+                        let p = entry.path();
+                        p.clone().extension()
+                            .filter(|ext| ext.to_str() == Some("opam"))
+                            .map(move |_| p.file_stem().expect("REASON").to_os_string())
+                    } else {
+                        None
+                    }
+                }).expect("No project found in directory, try specifying with --args");
+                let mut eff = self.args.to_vec();
+                p = project.into_string().expect("blah");
+                println!("Found project {}", &p);
+                eff.push(p.as_str());
+                eff
+            } else {
+                self.args.to_vec()
+            }
         };
 
         if self.name == "open" {
@@ -213,6 +236,10 @@ impl Bin {
                 .wait()
                 .expect("wait failed");
         }
+
+        let _ = p;
+
+        Ok(())
     }
 }
 
@@ -331,7 +358,7 @@ fn main() {
             .and_then(|r| args.command.get_resource(r))
             .map_or_else(
                 || dry_run(&args.lang, &args.command, true),
-                |b| b.run(&args.args),
+                |b| b.run(&args.args).expect("run failed you bastards"),
             );
     }
 }
