@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, DirEntry};
+use std::io::Error;
 use std::process::Stdio;
 
 use clap::{Parser, ValueEnum};
@@ -185,11 +186,39 @@ lazy_static! {
 struct Bin {
     name: &'static str,
     args: Box<[&'static str]>,
-    required_args: u8,
+    required_args: usize,
+}
+
+fn find_racket_source(e: Result<DirEntry, Error>) -> Option<String> {
+    if let Ok(entry) = e {
+        let p = entry.path();
+        match p.extension() {
+            Some(ext) if ext.to_str() == Some("rkt") => {
+                p.to_str().map(|s| s.to_string())
+            }
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+fn find_ocaml_project(e: Result<DirEntry, Error>) -> Option<String> {
+    if let Ok(entry) = e {
+        let p = entry.path();
+        match (p.extension(), p.file_stem()) {
+            (Some(ext), Some(stem)) if ext.to_str() == Some("opam") => {
+                stem.to_str().map(|s| s.to_string())
+            }
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 impl Bin {
-    fn new(name: &'static str, args: Box<[&'static str]>, required_args: u8) -> Self {
+    fn new(name: &'static str, args: Box<[&'static str]>, required_args: usize) -> Self {
         Bin { name, args, required_args }
     }
 
@@ -205,36 +234,40 @@ impl Bin {
         let mut p = String::new();
         // if user_args is None, and arg is required, should try to "fill in" valid arg
         // TODO: check if all args have been provided, if not, try to "fill in" valid arg, otherwise err
+        // check if args count == required_args, if not, magic
         let args = if let Some(args) = user_args {
             let mut v = self.args.to_vec();
             v.push(&args);
             v
-        } else {
+        } else if self.args.len() != self.required_args {
             if self.name == "dune" && self.args[0] == "exec" {
                 let mut entries = fs::read_dir("./")?;
-                let project = entries
-                    .find_map(|e| {
-                        if let Ok(entry) = e {
-                            let p = entry.path();
-                            match (p.extension(), p.file_stem()) {
-                                (Some(ext), Some(stem)) if ext.to_str() == Some("opam") => {
-                                    Some(stem.to_os_string())
-                                }
-                                _ => None,
-                            }
-                        } else {
-                            None
-                        }
-                    })
+                p = entries
+                    .find_map(find_ocaml_project)
                     .expect("No project found in directory, try specifying with --args");
-                let mut eff = self.args.to_vec();
-                p = project.into_string().expect("blah");
+                let mut v = self.args.to_vec();
                 println!("Found project {}", &p);
-                eff.push(p.as_str());
-                eff
+                v.push(p.as_str());
+                v
+            } else if self.name == "racket" {
+                let mut entries = fs::read_dir("./")?;
+                p = entries
+                    .find_map(find_racket_source)
+                    .or_else(|| {
+                        fs::read_dir("./src").ok()
+                            .map(|mut es| es.find_map(find_racket_source))
+                            .flatten()
+                    })
+                    .expect("No racket file found to run, try specifying with --args");
+                let mut v = self.args.to_vec();
+                println!("Found source {}", &p);
+                v.push(p.as_str());
+                v
             } else {
                 self.args.to_vec()
             }
+        } else {
+            self.args.to_vec()
         };
 
         if self.name == "open" {
