@@ -383,9 +383,7 @@ fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
 // return result from main
 // TODO?: change --args to trailing_var_arg (won't do until I have a reason to)
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
-// TODO: required args?
-// TODO: intelligent running of programs/commands based on context
-// e.g. `poly ocaml run` would work without an arg in a dune project
+// TODO: add rust-analyzer to nix flake, update hash in nix flake
 fn main() {
     let args = Args::parse();
 
