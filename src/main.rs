@@ -101,82 +101,82 @@ lazy_static! {
     static ref MV2: HashMap<Lang, ResourcesV2> = {
         let mut map = HashMap::new();
         map.insert(Lang::C, ResourcesV2 {
-            build: Some(Bin::new("make", Box::new([]))), // requires file(s)
+            build: Some(Bin::none("make")), // requires file(s)
             run: None,
             test: None,
             repl: None,
-            docs: Some(Bin::new("open", Box::new(["https://en.cppreference.com/w/c"])))
+            docs: Some(Bin::one("open", "https://en.cppreference.com/w/c"))
         });
         map.insert(Lang::CPP, ResourcesV2 {
-            build: Some(Bin::new("make", Box::new([]))), // requires file(s)
+            build: Some(Bin::none("make")), // requires file(s)
             run: None,
             test: None,
             repl: None,
-            docs: Some(Bin::new("open", Box::new(["https://en.cppreference.com/w/cpp"])))
+            docs: Some(Bin::one("open", "https://en.cppreference.com/w/cpp"))
         });
         map.insert(Lang::Zig, ResourcesV2 {
-            build: Some(Bin::new("zig", Box::new(["build"]))),
-            run: Some(Bin::new("zig", Box::new(["run"]))),
-            test: Some(Bin::new("zig", Box::new(["test"]))),
+            build: Some(Bin::one("zig", "build")),
+            run: Some(Bin::one("zig", "run")),
+            test: Some(Bin::one("zig", "test")),
             repl: None,
-            docs: Some(Bin::new("open", Box::new(["https://ziglang.org/documentation/master/std/#A;std"]))),
+            docs: Some(Bin::one("open", "https://ziglang.org/documentation/master/std/#A;std")),
         });
         map.insert(Lang::Scheme, ResourcesV2 {
             build: None,
             run: None,
             test: None,
-            repl: Some(Bin::new("guile", Box::new([]))),
-            docs: Some(Bin::new("open", Box::new(["https://www.gnu.org/software/guile/manual/guile.html#API-Reference"])))
+            repl: Some(Bin::none("guile")),
+            docs: Some(Bin::one("open", "https://www.gnu.org/software/guile/manual/guile.html#API-Reference"))
         });
         map.insert(Lang::CommonLisp, ResourcesV2 {
             build: None,
             run: None,
             test: None,
-            repl: Some(Bin::new("sbcl", Box::new([]))),
-            docs: Some(Bin::new("open", Box::new(["https://www.lispworks.com/documentation/lw51/CLHS/Front/X_AllSym.htm"])))
+            repl: Some(Bin::none("sbcl")),
+            docs: Some(Bin::one("open", "https://www.lispworks.com/documentation/lw51/CLHS/Front/X_AllSym.htm"))
         });
         map.insert(Lang::Racket, ResourcesV2 {
             build: None,
-            run: Some(Bin::new("racket", Box::new([]))),
+            run: Some(Bin::new("racket", Box::new([]), 1)),
             test: None,
-            repl: Some(Bin::new("racket", Box::new([]))),
-            docs: Some(Bin::new("open", Box::new(["https://docs.racket-lang.org/reference/index.html"])))
+            repl: Some(Bin::none("racket")),
+            docs: Some(Bin::one("open", "https://docs.racket-lang.org/reference/index.html"))
         });
         map.insert(Lang::Sml, ResourcesV2 {
             build: None,
             run: None,
             test: None,
-            repl: Some(Bin::new("sml", Box::new([]))),
-            docs: Some(Bin::new("open", Box::new(["https://smlfamily.github.io/Basis/overview.html"])))
+            repl: Some(Bin::none("sml")),
+            docs: Some(Bin::one("open", "https://smlfamily.github.io/Basis/overview.html"))
         });
         map.insert(Lang::Haskell, ResourcesV2 {
-            build: Some(Bin::new("stack", Box::new(["build"]))),
-            run: Some(Bin::new("stack", Box::new(["run"]))),
-            test: Some(Bin::new("stack", Box::new(["test"]))),
-            repl: Some(Bin::new("stack", Box::new(["ghci"]))),
-            docs: Some(Bin::new("open", Box::new(["https://hoogle.haskell.org/"])))
+            build: Some(Bin::one("stack", "build")),
+            run: Some(Bin::one("stack", "run")),
+            test: Some(Bin::one("stack", "test")),
+            repl: Some(Bin::one("stack", "ghci")),
+            docs: Some(Bin::one("open", "https://hoogle.haskell.org/"))
         });
         map.insert(Lang::Ocaml, ResourcesV2 {
-            build: Some(Bin::new("dune", Box::new(["build"]))),
-            run: Some(Bin::new("dune", Box::new(["exec"]))),
-            test: Some(Bin::new("dune", Box::new(["test"]))),
-            repl: Some(Bin::new("utop", Box::new([]))),
-            docs: Some(Bin::new("open", Box::new(["https://twitch.tv/dmmulroy"])))
+            build: Some(Bin::one("dune", "build")),
+            run: Some(Bin::new("dune", Box::new(["exec"]), 2)),
+            test: Some(Bin::one("dune", "test")),
+            repl: Some(Bin::none("utop")),
+            docs: Some(Bin::one("open", "https://twitch.tv/dmmulroy"))
         });
         map.insert(Lang::Rust, ResourcesV2 {
-            build: Some(Bin::new("cargo", Box::new(["build"]))),
-            run: Some(Bin::new("cargo", Box::new(["run"]))),
-            test: Some(Bin::new("cargo", Box::new(["test"]))),
-            repl: Some(Bin::new("irust", Box::new([]))),
+            build: Some(Bin::one("cargo", "build")),
+            run: Some(Bin::one("cargo", "run")),
+            test: Some(Bin::one("cargo", "test")),
+            repl: Some(Bin::none("irust")),
             // TODO: should we do `cargo doc --open` or url?
-            docs: Some(Bin::new("open", Box::new(["https://doc.rust-lang.org/stable/std/"])))
+            docs: Some(Bin::one("open", "https://doc.rust-lang.org/stable/std/"))
         });
         map.insert(Lang::Clojure, ResourcesV2 {
-            build: Some(Bin::new("lein", Box::new(["uberjar"]))),
-            run: Some(Bin::new("lein", Box::new(["run"]))),
-            test: Some(Bin::new("lein", Box::new(["test"]))),
-            repl: Some(Bin::new("lein", Box::new(["repl"]))),
-            docs: Some(Bin::new("open", Box::new(["https://clojuredocs.org"])))
+            build: Some(Bin::one("lein", "uberjar")),
+            run: Some(Bin::one("lein", "run")),
+            test: Some(Bin::one("lein", "test")),
+            repl: Some(Bin::one("lein", "repl")),
+            docs: Some(Bin::one("open", "https://clojuredocs.org"))
         });
         map
     };
@@ -185,34 +185,48 @@ lazy_static! {
 struct Bin {
     name: &'static str,
     args: Box<[&'static str]>,
+    required_args: u8,
 }
 
 impl Bin {
-    fn new(name: &'static str, args: Box<[&'static str]>) -> Self {
-        Bin { name, args }
+    fn new(name: &'static str, args: Box<[&'static str]>, required_args: u8) -> Self {
+        Bin { name, args, required_args }
+    }
+
+    fn none(name: &'static str) -> Self {
+        Self::new(name, Box::new([]), 0)
+    }
+
+    fn one(name: &'static str, arg: &'static str) -> Self {
+        Self::new(name, Box::new([arg]), 1)
     }
 
     fn run(&self, user_args: &Option<String>) -> Result<(), std::io::Error> {
         let mut p = String::new();
         // if user_args is None, and arg is required, should try to "fill in" valid arg
+        // TODO: check if all args have been provided, if not, try to "fill in" valid arg, otherwise err
         let args = if let Some(args) = user_args {
             let mut v = self.args.to_vec();
             v.push(&args);
             v
         } else {
-            // TODO: something that makes this work, like maybe matches instead of all of these nested if's and just not coding anymore in your life
             if self.name == "dune" && self.args[0] == "exec" {
                 let mut entries = fs::read_dir("./")?;
-                let project = entries.find_map(|e| {
-                    if let Ok(entry) = e {
-                        let p = entry.path();
-                        p.clone().extension()
-                            .filter(|ext| ext.to_str() == Some("opam"))
-                            .map(move |_| p.file_stem().expect("REASON").to_os_string())
-                    } else {
-                        None
-                    }
-                }).expect("No project found in directory, try specifying with --args");
+                let project = entries
+                    .find_map(|e| {
+                        if let Ok(entry) = e {
+                            let p = entry.path();
+                            match (p.extension(), p.file_stem()) {
+                                (Some(ext), Some(stem)) if ext.to_str() == Some("opam") => {
+                                    Some(stem.to_os_string())
+                                }
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("No project found in directory, try specifying with --args");
                 let mut eff = self.args.to_vec();
                 p = project.into_string().expect("blah");
                 println!("Found project {}", &p);
@@ -224,7 +238,6 @@ impl Bin {
         };
 
         if self.name == "open" {
-            // TODO: print failure of open to console
             open::that(args[0]).expect("failed to open");
         } else {
             std::process::Command::new(self.name)
@@ -353,7 +366,6 @@ fn main() {
     if args.dry {
         dry_run(&args.lang, &args.command, false);
     } else {
-
         MV2.get(&args.lang)
             .and_then(|r| args.command.get_resource(r))
             .map_or_else(
