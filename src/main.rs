@@ -231,10 +231,9 @@ impl Bin {
     }
 
     fn run(&self, user_args: &Option<String>) -> Result<(), std::io::Error> {
+        // TODO: use a Cow here instead
         let mut p = String::new();
-        // if user_args is None, and arg is required, should try to "fill in" valid arg
-        // TODO: check if all args have been provided, if not, try to "fill in" valid arg, otherwise err
-        // check if args count == required_args, if not, magic
+
         let args = if let Some(args) = user_args {
             let mut v = self.args.to_vec();
             v.push(&args);
