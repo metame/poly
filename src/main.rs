@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::{self, DirEntry};
 use std::io::Error;
@@ -138,7 +139,7 @@ lazy_static! {
         });
         map.insert(Lang::Racket, ResourcesV2 {
             build: None,
-            run: Some(Bin::new("racket", Box::new([]), 1)),
+            run: Some(Bin::new("racket", vec![], 1)),
             test: None,
             repl: Some(Bin::none("racket")),
             docs: Some(Bin::one("open", "https://docs.racket-lang.org/reference/index.html"))
@@ -159,7 +160,7 @@ lazy_static! {
         });
         map.insert(Lang::Ocaml, ResourcesV2 {
             build: Some(Bin::one("dune", "build")),
-            run: Some(Bin::new("dune", Box::new(["exec"]), 2)),
+            run: Some(Bin::new("dune", vec![Cow::from("exec")], 2)),
             test: Some(Bin::one("dune", "test")),
             repl: Some(Bin::none("utop")),
             docs: Some(Bin::one("open", "https://twitch.tv/dmmulroy"))
@@ -183,9 +184,10 @@ lazy_static! {
     };
 }
 
+#[derive(Clone)]
 struct Bin {
     name: &'static str,
-    args: Box<[&'static str]>,
+    args: Vec<Cow<'static, str>>,
     required_args: usize,
 }
 
@@ -218,39 +220,32 @@ fn find_ocaml_project(e: Result<DirEntry, Error>) -> Option<String> {
 }
 
 impl Bin {
-    fn new(name: &'static str, args: Box<[&'static str]>, required_args: usize) -> Self {
+    fn new(name: &'static str, args: Vec<Cow<'static, str>>, required_args: usize) -> Self {
         Bin { name, args, required_args }
     }
 
     fn none(name: &'static str) -> Self {
-        Self::new(name, Box::new([]), 0)
+        Self::new(name, vec![],  0)
     }
 
     fn one(name: &'static str, arg: &'static str) -> Self {
-        Self::new(name, Box::new([arg]), 1)
+        Self::new(name, vec![arg.into()], 1)
     }
 
-    fn run(&self, user_args: &Option<String>) -> Result<(), std::io::Error> {
-        // TODO: use a Cow here instead
-        let mut p = String::new();
-
-        let args = if let Some(args) = user_args {
-            let mut v = self.args.to_vec();
-            v.push(&args);
-            v
+    fn run(&mut self, user_args: Option<String>) -> Result<(), std::io::Error> {
+        if let Some(args) = user_args {
+            self.args.push(args.into());
         } else if self.args.len() != self.required_args {
             if self.name == "dune" && self.args[0] == "exec" {
                 let mut entries = fs::read_dir("./")?;
-                p = entries
+                let p = entries
                     .find_map(find_ocaml_project)
                     .expect("No project found in directory, try specifying with --args");
-                let mut v = self.args.to_vec();
                 println!("Found project {}", &p);
-                v.push(p.as_str());
-                v
+                self.args.push(p.into());
             } else if self.name == "racket" {
                 let mut entries = fs::read_dir("./")?;
-                p = entries
+                let p = entries
                     .find_map(find_racket_source)
                     .or_else(|| {
                         fs::read_dir("./src").ok()
@@ -258,22 +253,17 @@ impl Bin {
                             .flatten()
                     })
                     .expect("No racket file found to run, try specifying with --args");
-                let mut v = self.args.to_vec();
                 println!("Found source {}", &p);
-                v.push(p.as_str());
-                v
-            } else {
-                self.args.to_vec()
+                self.args.push(p.into());
             }
-        } else {
-            self.args.to_vec()
-        };
+        }
 
         if self.name == "open" {
-            open::that(args[0]).expect("failed to open");
+            open::that(self.args.first().expect("nothing to open wtf").as_ref())
+                       .expect("failed to open");
         } else {
             std::process::Command::new(self.name)
-                .args(args)
+                .args(self.args.iter().map(|s| s.as_ref()))
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit())
                 .spawn()
@@ -282,12 +272,11 @@ impl Bin {
                 .expect("wait failed");
         }
 
-        let _ = p;
-
         Ok(())
     }
 }
 
+#[derive(Clone)]
 struct ResourcesV2 {
     build: Option<Bin>,
     run: Option<Bin>,
@@ -336,7 +325,17 @@ struct Args {
 }
 
 impl Command {
-    fn get_resource<'a>(&self, r: &'a ResourcesV2) -> Option<&'a Bin> {
+    fn get_resource<'a>(&self, r: ResourcesV2) -> Option<Bin> {
+        match self {
+            Self::Build => r.build,
+            Self::Run => r.run,
+            Self::Test => r.test,
+            Self::Repl => r.repl,
+            Self::Docs => r.docs,
+        }
+    }
+
+    fn get_resource_ref<'a>(&self, r: &'a ResourcesV2) -> Option<&'a Bin> {
         match self {
             Self::Build => r.build.as_ref(),
             Self::Run => r.run.as_ref(),
@@ -384,6 +383,7 @@ fn dry_run(lang: &Lang, cmd: &Command, eff: bool) {
 // TODO?: change --args to trailing_var_arg (won't do until I have a reason to)
 // https://docs.rs/clap/latest/clap/struct.Arg.html#method.trailing_var_arg
 // TODO: add rust-analyzer to nix flake, update hash in nix flake
+// TODO: use rwlock instead of cloning MV2, e.g. https://github.com/amitsingh19975/EOC/blob/master/src/eoc/utils/string.rs
 fn main() {
     let args = Args::parse();
 
@@ -396,11 +396,11 @@ fn main() {
     if args.dry {
         dry_run(&args.lang, &args.command, false);
     } else {
-        MV2.get(&args.lang)
+        MV2.clone().remove(&args.lang)
             .and_then(|r| args.command.get_resource(r))
             .map_or_else(
                 || dry_run(&args.lang, &args.command, true),
-                |b| b.run(&args.args).expect("run failed you bastards"),
+                |mut b| b.run(args.args).expect("run failed you bastards"),
             );
     }
 }
